@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
+import os
 from datetime import datetime
 import uuid
 import base64
@@ -227,12 +228,34 @@ async def list_storage_files():
 if __name__ == "__main__":
     print("🚀 Starting Stash Test Server...")
     print(f"📋 Configuration loaded: {len(config)} settings")
-    print(f"🏠 Server will run on: http://{config.get('host', '0.0.0.0')}:{config.get('port', 8080)}")
     
-    uvicorn.run(
-        "simple_server:app",
-        host=config.get('host', '0.0.0.0'),
-        port=config.get('port', 8080),
-        reload=True,
-        log_level="info"
-    )
+    # Get port from environment (Cloud Run sets this)
+    port = int(os.environ.get('PORT', config.get('port', 8080)))
+    host = os.environ.get('HOST', config.get('host', '0.0.0.0'))
+    
+    print(f"🏠 Server will run on: http://{host}:{port}")
+    
+    # Use different settings for Cloud Run vs local development
+    is_cloud_run = os.environ.get('K_SERVICE') is not None
+    
+    if is_cloud_run:
+        print("☁️  Running in Google Cloud Run environment")
+        # Cloud Run configuration
+        uvicorn.run(
+            "simple_server:app",
+            host=host,
+            port=port,
+            reload=False,  # Don't reload in production
+            log_level="info",
+            access_log=True
+        )
+    else:
+        print("💻 Running in local development environment")
+        # Local development configuration
+        uvicorn.run(
+            "simple_server:app",
+            host=host,
+            port=port,
+            reload=True,
+            log_level="debug"
+        )

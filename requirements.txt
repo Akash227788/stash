@@ -5,6 +5,9 @@ google-cloud-storage
 google-cloud-vision
 google-cloud-pubsub
 google-generativeai
+google-adk
 python-dotenv
 requests
 gunicorn
+pydantic
+asyncio-extras

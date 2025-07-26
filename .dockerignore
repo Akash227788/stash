@@ -1,0 +1,9 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+cloudbuild.yaml
+cloud_run.sh
+README.md
+.env
+.venv

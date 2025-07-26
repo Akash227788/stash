@@ -1,5 +1,10 @@
-pip
-autopep8
-Flask==3.0.3
-gunicorn==22.0.0
-Werkzeug==3.0.6
+fastapi
+uvicorn
+google-cloud-firestore
+google-cloud-storage
+google-cloud-vision
+google-cloud-pubsub
+google-generativeai
+python-dotenv
+requests
+gunicorn

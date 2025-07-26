@@ -1,3 +1,2 @@
-#!/bin/sh
-source .venv/bin/activate
-python -u -m flask --app main run --debug
+#!/bin/bash
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app -b 0.0.0.0:8080

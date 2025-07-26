@@ -1,0 +1,21 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'gcr.io/$PROJECT_ID/stash-api', '.' ]
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'push', 'gcr.io/$PROJECT_ID/stash-api' ]
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - 'run'
+  - 'deploy'
+  - 'stash-api'
+  - '--image'
+  - 'gcr.io/$PROJECT_ID/stash-api'
+  - '--region'
+  - 'us-central1'
+  - '--platform'
+  - 'managed'
+  - '--allow-unauthenticated'
+  - '--service-account'
+  - 'stash-api-runner@$PROJECT_ID.iam.gserviceaccount.com'
+images:
+- 'gcr.io/$PROJECT_ID/stash-api'

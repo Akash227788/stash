@@ -1,14 +1,19 @@
-import os
+# main.py
+from fastapi import FastAPI
+from receipt_agent import router as receipt_router
+from analytics_agent import router as analytics_router
+from game_agent import router as game_router
+from wallet_agent import router as wallet_router
+from root_agent import router as root_router
 
-from flask import Flask
+app = FastAPI()
 
-app = Flask(__name__)
-
-@app.route("/")
-def hello_world():
-  """Example Hello World route."""
-  name = os.environ.get("NAME", "World")
-  return f"Hello {name}!"
+app.include_router(root_router)
+app.include_router(receipt_router, prefix="/receipt", tags=["Receipt Processing"])
+app.include_router(analytics_router, prefix="/analytics", tags=["Financial Analytics"])
+app.include_router(game_router, prefix="/game", tags=["Gamification"])
+app.include_router(wallet_router, prefix="/wallet", tags=["Digital Wallet"])
 
 if __name__ == "__main__":
-  app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 3000)))
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)

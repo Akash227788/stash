@@ -6,12 +6,15 @@ This replaces the traditional FastAPI routers with ADK agent patterns.
 import os
 import asyncio
 from typing import Dict, Any, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
+import uuid
 
 # Load environment variables first
 from utils.env_loader import load_env_from_file, get_config
+from utils.storage_client import get_storage_client
 load_env_from_file()
+config = get_config()
 
 try:
     from google.adk import Session  # type: ignore
@@ -55,6 +58,75 @@ app = FastAPI(title="Stash ADK API", description="ADK-powered financial manageme
 
 # Initialize ADK server
 stash_server = StashADKServer()
+
+# Initialize storage client for file uploads
+try:
+    storage_client = get_storage_client()
+    if storage_client:
+        bucket = storage_client.bucket(config.get('gcs_bucket', 'stash_bucket_1'))
+    else:
+        bucket = None
+    print(f"✅ Initialized Google Cloud Storage client")
+except Exception as e:
+    print(f"❌ Failed to initialize Google Cloud Storage: {e}")
+    bucket = None
+
+@app.post("/upload")
+async def upload_receipt(
+    file: UploadFile = File(...),
+    userId: str = Form(...)
+):
+    """
+    Upload a receipt image and return the image URL and user ID.
+    This endpoint uploads the file to Google Cloud Storage and returns the required response format.
+    """
+    if not bucket:
+        raise HTTPException(status_code=503, detail="Cloud Storage not available")
+    
+    try:
+        # Validate file type (optional - you can modify this based on your requirements)
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
+            )
+        
+        # Generate unique filename
+        if file.filename and '.' in file.filename:
+            file_extension = file.filename.split('.')[-1]
+        else:
+            file_extension = 'jpg'  # Default extension
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        blob_name = f"receipts/{userId}/{unique_filename}"
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Upload to Cloud Storage
+        blob = bucket.blob(blob_name)
+        blob.upload_from_string(
+            file_content,
+            content_type=file.content_type
+        )
+        
+        # Generate the Cloud Storage URL
+        image_url = f"gs://{bucket.name}/{blob_name}"
+        
+        print(f"✅ Successfully uploaded file to {image_url}")
+        
+        # Return the required response format
+        return {
+            "imageUrl": image_url,
+            "userId": userId
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"❌ Error uploading file: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 
 @app.get("/")

@@ -1,6 +1,7 @@
 # simple_server.py - Simple FastAPI server for testing data flow
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 import uvicorn
 import json
 import os
@@ -224,6 +225,205 @@ async def list_storage_files():
     except Exception as e:
         print(f"❌ Error listing storage files: {e}")
         raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
+
+@app.post("/upload")
+async def upload_receipt(
+    file: UploadFile = File(...),
+    userId: str = Form(...)
+):
+    """
+    Upload a receipt image and return the image URL and user ID.
+    This endpoint uploads the file to Google Cloud Storage and returns the required response format.
+    """
+    if not bucket:
+        raise HTTPException(status_code=503, detail="Cloud Storage not available")
+    
+    try:
+        # Validate file type (optional - you can modify this based on your requirements)
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
+            )
+        
+        # Generate unique filename
+        if file.filename and '.' in file.filename:
+            file_extension = file.filename.split('.')[-1]
+        else:
+            file_extension = 'jpg'  # Default extension
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        blob_name = f"receipts/{userId}/{unique_filename}"
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Upload to Cloud Storage
+        blob = bucket.blob(blob_name)
+        blob.upload_from_string(
+            file_content,
+            content_type=file.content_type
+        )
+        
+        # Generate the Cloud Storage URL
+        image_url = f"gs://{bucket.name}/{blob_name}"
+        
+        print(f"✅ Successfully uploaded file to {image_url}")
+        
+        # Return the required response format
+        return {
+            "imageUrl": image_url,
+            "userId": userId
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"❌ Error uploading file: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+
+@app.post("/upload-binary")
+async def upload_receipt_binary(
+    request: Request,
+    userId: str = Header(..., alias="X-User-Id"),
+    content_type: Optional[str] = Header(None, alias="Content-Type")
+):
+    """
+    Upload a receipt image from binary data in request body and return the image URL and user ID.
+    This endpoint accepts binary image data directly in the request body.
+    
+    Headers required:
+    - X-User-Id: User ID
+    - Content-Type: Image content type (e.g., image/jpeg, image/png)
+    """
+    if not bucket:
+        raise HTTPException(status_code=503, detail="Cloud Storage not available")
+    
+    try:
+        # Validate content type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid Content-Type header. Allowed types: {', '.join(allowed_types)}"
+            )
+        
+        # Read binary data from request body
+        binary_data = await request.body()
+        
+        if not binary_data:
+            raise HTTPException(status_code=400, detail="No binary data found in request body")
+        
+        # Determine file extension from content type
+        extension_mapping = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg', 
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp'
+        }
+        file_extension = extension_mapping.get(content_type, 'jpg')
+        
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        blob_name = f"receipts/{userId}/{unique_filename}"
+        
+        # Upload to Cloud Storage
+        blob = bucket.blob(blob_name)
+        blob.upload_from_string(
+            binary_data,
+            content_type=content_type
+        )
+        
+        # Generate the Cloud Storage URL
+        image_url = f"gs://{bucket.name}/{blob_name}"
+        
+        print(f"✅ Successfully uploaded binary file to {image_url}")
+        
+        # Return the required response format
+        return {
+            "imageUrl": image_url,
+            "userId": userId
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"❌ Error uploading binary file: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading binary file: {str(e)}")
+
+@app.post("/upload-binary-query")
+async def upload_receipt_binary_query(
+    request: Request,
+    userId: str,
+    contentType: str = "image/jpeg"
+):
+    """
+    Upload a receipt image from binary data in request body using query parameters.
+    This endpoint accepts binary image data directly in the request body with user info as query params.
+    
+    Query parameters:
+    - userId: User ID (required)
+    - contentType: Image content type (optional, defaults to image/jpeg)
+    """
+    if not bucket:
+        raise HTTPException(status_code=503, detail="Cloud Storage not available")
+    
+    try:
+        # Validate content type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if contentType not in allowed_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid contentType parameter. Allowed types: {', '.join(allowed_types)}"
+            )
+        
+        # Read binary data from request body
+        binary_data = await request.body()
+        
+        if not binary_data:
+            raise HTTPException(status_code=400, detail="No binary data found in request body")
+        
+        # Determine file extension from content type
+        extension_mapping = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg', 
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp'
+        }
+        file_extension = extension_mapping.get(contentType, 'jpg')
+        
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        blob_name = f"receipts/{userId}/{unique_filename}"
+        
+        # Upload to Cloud Storage
+        blob = bucket.blob(blob_name)
+        blob.upload_from_string(
+            binary_data,
+            content_type=contentType
+        )
+        
+        # Generate the Cloud Storage URL
+        image_url = f"gs://{bucket.name}/{blob_name}"
+        
+        print(f"✅ Successfully uploaded binary file to {image_url}")
+        
+        # Return the required response format
+        return {
+            "imageUrl": image_url,
+            "userId": userId
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"❌ Error uploading binary file: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading binary file: {str(e)}")
 
 if __name__ == "__main__":
     print("🚀 Starting Stash Test Server...")
